@@ -1,0 +1,46 @@
+# Plant Ranger Check - Sample Utterances
+
+## CheckPlantHealthIntent
+check my plant health
+how is my plant doing
+is my plant healthy
+plant status check
+check plant status
+what's my plant health
+plant health check
+how are my plants
+plant health status
+check plants
+are my plants okay
+plant condition
+plant wellness check
+how's the plant doing
+plant health report
+check my garden
+garden health check
+plant monitoring
+plant care status
+vegetation health
+
+## Help Intent
+help
+what can you do
+how do I use this
+what commands are available
+how does this work
+what can I ask
+instructions
+guide me
+tell me more
+what is this skill
+
+## Stop Intent
+stop
+end
+quit
+exit
+goodbye
+bye
+that's all
+never mind
+cancel
