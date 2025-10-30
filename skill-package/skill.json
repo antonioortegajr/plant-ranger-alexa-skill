@@ -1,0 +1,59 @@
+{
+  "manifest": {
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "arn:aws:lambda:us-east-1:529123413029:function:plant-ranger-alexa-handler"
+        },
+        "interfaces": [
+          {
+            "type": "AUDIO_PLAYER"
+          }
+        ]
+      }
+    },
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "Plant Ranger Check",
+          "summary": "Check your plant health status using Plant Ranger API",
+          "description": "Plant Ranger Check helps you monitor the health of your plants by connecting to the Plant Ranger API. Simply ask \"check my plant health\" to get a status update on your plants.",
+          "keywords": [
+            "plants",
+            "health",
+            "garden",
+            "monitoring",
+            "plant care"
+          ],
+          "smallIconUri": "https://example.com/small-icon.png",
+          "largeIconUri": "https://example.com/large-icon.png"
+        }
+      },
+      "isAvailableWorldwide": true,
+      "testingInstructions": "Simply say 'check my plant health' to get a status update. The skill connects directly to the Plant Ranger API health endpoint.",
+      "category": "HEALTH_AND_FITNESS",
+      "distributionCountries": []
+    },
+    "permissions": [
+      {
+        "name": "alexa::profile:email:read"
+      },
+      {
+        "name": "alexa::profile:name:read"
+      }
+    ],
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": true,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false,
+      "locales": {
+        "en-US": {
+          "privacyPolicyUrl": "https://example.com/privacy-policy",
+          "termsOfUseUrl": "https://example.com/terms-of-use"
+        }
+      }
+    }
+  }
+}

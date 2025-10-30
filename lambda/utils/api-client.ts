@@ -39,7 +39,7 @@ export class ApiClient {
       
       // Handle different types of errors
       if (axios.isAxiosError(error)) {
-        if (error.response?.status >= 500) {
+        if (error.response && error.response.status >= 500) {
           throw new Error('Plant health service is temporarily unavailable');
         } else if (error.code === 'ECONNABORTED') {
           throw new Error('Request timeout - please try again');

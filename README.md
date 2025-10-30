@@ -49,13 +49,20 @@ plant-ranger-alexa-skill/
 │   │   ├── oauth.ts             # OAuth management utilities
 │   │   └── api-client.ts        # Plant Ranger API client
 │   └── package.json
-├── alexa-skill/                 # Alexa skill configuration
+├── skill-package/               # ASK CLI skill package
 │   ├── skill.json               # Skill manifest
+│   └── interactionModels/
+│       └── custom/
+│           └── en-US.json       # Interaction model
+├── alexa-skill/                 # Original skill files (backup)
+│   ├── skill.json               
 │   ├── models/
-│   │   └── en-US.json           # Interaction model
+│   │   └── en-US.json           
 │   └── utterances/
-│       └── en-US.txt            # Sample utterances
-├── deploy.sh                    # Deployment script
+│       └── en-US.txt            
+├── ask-resources.json           # ASK CLI configuration
+├── ask-deploy.sh                # ASK CLI deployment script
+├── deploy.sh                    # CDK deployment script
 └── README.md
 ```
 
@@ -99,16 +106,33 @@ chmod +x deploy.sh
 ./deploy.sh
 ```
 
-### 4. Configure Alexa Skill
+### 4. Deploy with ASK CLI (Recommended)
+
+The project is set up for deployment using the Alexa Skills Kit Command Line Interface (ASK CLI):
+
+```bash
+# First-time setup: Initialize ASK CLI
+ask init
+
+# Deploy the skill (compiles TypeScript and deploys everything)
+./ask-deploy.sh
+
+# Or manually:
+ask deploy
+```
+
+**See [ASK_CLI_DEPLOYMENT.md](./ASK_CLI_DEPLOYMENT.md) for detailed instructions.**
+
+### 5. Alternative: Manual Configuration
 
 1. Go to [Alexa Developer Console](https://developer.amazon.com/alexa/console/ask)
 2. Create a new skill named "Plant Ranger Check"
-3. Upload the `alexa-skill/skill.json` manifest
-4. Upload the `alexa-skill/models/en-US.json` interaction model
-5. Set the endpoint to your deployed Lambda ARN
-6. Enable account linking with OAuth 2.0
+3. Upload the `skill-package/skill.json` manifest
+4. Upload the `skill-package/interactionModels/custom/en-US.json` interaction model
+5. Set the endpoint to your deployed Lambda ARN:
+   `arn:aws:lambda:us-east-1:529123413029:function:plant-ranger-alexa-handler`
 
-### 5. Test the Skill
+### 6. Test the Skill
 
 - Use the Alexa Developer Console test simulator
 - Test on a physical Alexa device

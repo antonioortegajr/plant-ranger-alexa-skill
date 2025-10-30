@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
 import { ApiClient } from './utils/api-client';
+import { OAuthManager } from './utils/oauth';
 
 
 interface AlexaRequest {
@@ -35,6 +36,11 @@ interface AlexaRequest {
       name: string;
       slots?: any;
     };
+    reason?: string;
+    error?: {
+      type: string;
+      message: string;
+    };
   };
 }
 
@@ -63,25 +69,39 @@ interface AlexaResponse {
 }
 
 export const handler = async (
-  event: APIGatewayProxyEvent,
+  event: any,
   context: Context
-): Promise<APIGatewayProxyResult> => {
-  console.log('Received Alexa request:', JSON.stringify(event, null, 2));
+): Promise<any> => {
+  console.log('Received event:', JSON.stringify(event, null, 2));
 
   try {
-    const alexaRequest: AlexaRequest = JSON.parse(event.body || '{}');
+    // Support both API Gateway proxy (event.body string) and direct Alexa (event.version)
+    let alexaRequest: AlexaRequest;
+    if (event && typeof event.body === 'string') {
+      alexaRequest = JSON.parse(event.body || '{}');
+    } else if (event && typeof event.body === 'object' && event.body !== null) {
+      // Some invokers may pass already-parsed body
+      alexaRequest = event.body as AlexaRequest;
+    } else {
+      alexaRequest = event as AlexaRequest;
+    }
+
     const response = await handleAlexaRequest(alexaRequest);
-    
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(response),
-    };
+
+    // If invoked via API Gateway proxy, return APIGatewayProxyResult
+    if (event && Object.prototype.hasOwnProperty.call(event, 'resource')) {
+      const apiResult: APIGatewayProxyResult = {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(response),
+      };
+      return apiResult;
+    }
+
+    // Direct Alexa invocation expects the response object directly
+    return response;
   } catch (error) {
     console.error('Error handling Alexa request:', error);
-    
     const errorResponse: AlexaResponse = {
       version: '1.0',
       response: {
@@ -93,19 +113,25 @@ export const handler = async (
       },
     };
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(errorResponse),
-    };
+    if (event && Object.prototype.hasOwnProperty.call(event, 'resource')) {
+      const apiError: APIGatewayProxyResult = {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(errorResponse),
+      };
+      return apiError;
+    }
+
+    return errorResponse;
   }
 };
 
 async function handleAlexaRequest(request: AlexaRequest): Promise<AlexaResponse> {
-  const { request: alexaRequest, session } = request;
-  const userId = session.user.userId;
+  const alexaRequest = request.request;
+  const session = (request as any).session;
+  const contextSystemUserId = (request as any)?.context?.System?.user?.userId;
+  const sessionUserId = session?.user?.userId;
+  const userId = sessionUserId || contextSystemUserId || 'unknown';
 
   switch (alexaRequest.type) {
     case 'LaunchRequest':
@@ -115,6 +141,7 @@ async function handleAlexaRequest(request: AlexaRequest): Promise<AlexaResponse>
       return handleIntentRequest(alexaRequest.intent!, userId);
 
     case 'SessionEndedRequest':
+      console.log('Session ended:', alexaRequest.reason, alexaRequest.error);
       return handleSessionEndedRequest();
 
     default:
@@ -160,7 +187,36 @@ async function handleIntentRequest(intent: any, userId: string): Promise<AlexaRe
 
 async function handleCheckPlantHealth(userId: string): Promise<AlexaResponse> {
   try {
-    // Make API call to check plant health (no authentication needed)
+    const oauthManager = new OAuthManager();
+    
+    // Check if user has OAuth tokens
+    const tokens = await oauthManager.getTokens(userId);
+    
+    if (!tokens) {
+      // No tokens found, provide account linking instructions
+      const authUrl = await oauthManager.getAuthorizationUrl(userId);
+      
+      return {
+        version: '1.0',
+        response: {
+          outputSpeech: {
+            type: 'PlainText',
+            text: 'To check your plant health, you need to link your Plant Ranger account first. Please visit the Alexa app to complete the account linking process.',
+          },
+          card: {
+            type: 'LinkAccount',
+            title: 'Link Plant Ranger Account',
+            content: 'Please link your Plant Ranger account to check your plant health status.',
+          },
+          shouldEndSession: true,
+        },
+      };
+    }
+
+    // Ensure tokens are valid (refresh if needed)
+    const validTokens = await oauthManager.ensureValidTokens(userId, tokens);
+    
+    // Make API call to check plant health with authentication
     const apiClient = new ApiClient();
     const plantHealth = await apiClient.checkPlantHealth();
 

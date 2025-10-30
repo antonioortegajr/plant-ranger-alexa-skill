@@ -1,0 +1,42 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "plant ranger check",
+      "intents": [
+        {
+          "name": "CheckPlantHealthIntent",
+          "slots": [],
+          "samples": [
+            "check my plant health",
+            "how is my plant doing",
+            "is my plant healthy",
+            "plant status check",
+            "check plant status",
+            "what's my plant health",
+            "plant health check",
+            "how are my plants",
+            "plant health status",
+            "check plants"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        }
+      ],
+      "types": []
+    }
+  }
+}

@@ -252,3 +252,8 @@ Dockerfile.local
 
 # Kubernetes
 *.kubeconfig
+
+# ASK CLI
+.ask/
+ask-states.json
+aws-config.json

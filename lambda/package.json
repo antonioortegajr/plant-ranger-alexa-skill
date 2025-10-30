@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Lambda functions for Plant Ranger Alexa Skill",
   "main": "index.js",
+  "scripts": {
+    "test:local:launch": "node local-test.js launch",
+    "test:local:intent": "node local-test.js intent"
+  },
   "dependencies": {
     "aws-sdk": "^2.1490.0",
     "axios": "^1.6.0"

@@ -2,19 +2,54 @@ import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
 
 export class PlantRangerStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Lambda execution role
+    // DynamoDB table for OAuth tokens
+    const oauthTokensTable = new dynamodb.Table(this, 'OAuthTokensTable', {
+      tableName: 'plant-ranger-oauth-tokens',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'tokenType', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Secrets Manager secret for OAuth credentials
+    const oauthCredentialsSecret = new secretsmanager.Secret(this, 'OAuthCredentialsSecret', {
+      secretName: 'plant-ranger-oauth-credentials',
+      description: 'OAuth credentials for Plant Ranger API',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({
+          clientId: 'your-client-id',
+          clientSecret: 'your-client-secret',
+          authUrl: 'https://api.plantranger.com/oauth/authorize',
+          tokenUrl: 'https://api.plantranger.com/oauth/token',
+          apiBaseUrl: 'https://api.plantranger.com/v1'
+        }),
+        generateStringKey: 'placeholder',
+        excludeCharacters: '"@/\\'
+      }
+    });
+
+    // Lambda execution role with proper permissions
     const lambdaRole = new iam.Role(this, 'PlantRangerLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
       ],
     });
+
+    // Add DynamoDB permissions
+    oauthTokensTable.grantReadWriteData(lambdaRole);
+    
+    // Add Secrets Manager permissions
+    oauthCredentialsSecret.grantRead(lambdaRole);
 
     // Main Alexa handler Lambda function
     const alexaHandler = new lambda.Function(this, 'AlexaHandler', {
@@ -24,16 +59,59 @@ export class PlantRangerStack extends cdk.Stack {
       role: lambdaRole,
       environment: {
         PLANT_RANGER_API_BASE_URL: 'https://api.plantranger.com',
+        OAUTH_TOKENS_TABLE: oauthTokensTable.tableName,
+        OAUTH_SECRETS_NAME: oauthCredentialsSecret.secretName,
         LOG_LEVEL: 'INFO',
       },
       logRetention: logs.RetentionDays.ONE_WEEK,
       timeout: cdk.Duration.seconds(30),
     });
 
-    // Output the Lambda function ARN for Alexa skill configuration
+    // OAuth handler Lambda function
+    const oauthHandler = new lambda.Function(this, 'OAuthHandler', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'oauth-handler.handler',
+      code: lambda.Code.fromAsset('../lambda'),
+      role: lambdaRole,
+      environment: {
+        OAUTH_TOKENS_TABLE: oauthTokensTable.tableName,
+        OAUTH_SECRETS_NAME: oauthCredentialsSecret.secretName,
+        LOG_LEVEL: 'INFO',
+      },
+      logRetention: logs.RetentionDays.ONE_WEEK,
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // API Gateway for OAuth callbacks
+    const api = new apigateway.RestApi(this, 'PlantRangerApi', {
+      restApiName: 'Plant Ranger OAuth API',
+      description: 'API Gateway for Plant Ranger OAuth callbacks',
+    });
+
+    // OAuth callback endpoint
+    const oauthResource = api.root.addResource('oauth');
+    oauthResource.addMethod('GET', new apigateway.LambdaIntegration(oauthHandler));
+    oauthResource.addMethod('POST', new apigateway.LambdaIntegration(oauthHandler));
+
+    // Outputs
     new cdk.CfnOutput(this, 'AlexaHandlerArn', {
       value: alexaHandler.functionArn,
       description: 'ARN of the Alexa handler Lambda function',
+    });
+
+    new cdk.CfnOutput(this, 'OAuthHandlerArn', {
+      value: oauthHandler.functionArn,
+      description: 'ARN of the OAuth handler Lambda function',
+    });
+
+    new cdk.CfnOutput(this, 'OAuthCallbackUrl', {
+      value: `${api.url}oauth`,
+      description: 'OAuth callback URL for Alexa skill configuration',
+    });
+
+    new cdk.CfnOutput(this, 'DynamoDBTableName', {
+      value: oauthTokensTable.tableName,
+      description: 'DynamoDB table name for OAuth tokens',
     });
   }
 }
