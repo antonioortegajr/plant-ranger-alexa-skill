@@ -188,49 +188,51 @@ async function handleIntentRequest(intent: any, userId: string): Promise<AlexaRe
 async function handleCheckPlantHealth(userId: string): Promise<AlexaResponse> {
   try {
     const oauthManager = new OAuthManager();
+    const apiClient = new ApiClient();
     
     // Check if user has OAuth tokens
     const tokens = await oauthManager.getTokens(userId);
     
-    if (!tokens) {
-      // No tokens found, provide account linking instructions
-      const authUrl = await oauthManager.getAuthorizationUrl(userId);
-      
-      return {
-        version: '1.0',
-        response: {
-          outputSpeech: {
-            type: 'PlainText',
-            text: 'To check your plant health, you need to link your Plant Ranger account first. Please visit the Alexa app to complete the account linking process.',
-          },
-          card: {
-            type: 'LinkAccount',
-            title: 'Link Plant Ranger Account',
-            content: 'Please link your Plant Ranger account to check your plant health status.',
-          },
-          shouldEndSession: true,
-        },
-      };
+    let plantHealth;
+    if (tokens) {
+      // Ensure tokens are valid (refresh if needed)
+      const validTokens = await oauthManager.ensureValidTokens(userId, tokens);
+      // Make API call with authentication
+      plantHealth = await apiClient.checkPlantHealth(validTokens.accessToken);
+    } else {
+      // No tokens found, try API call without authentication for testing
+      console.log('No OAuth tokens found, attempting API call without authentication');
+      try {
+        plantHealth = await apiClient.checkPlantHealth();
+      } catch (apiError: any) {
+        // If API call fails without auth, provide account linking instructions
+        if (apiError.response && (apiError.response.status === 401 || apiError.response.status === 403)) {
+          return {
+            version: '1.0',
+            response: {
+              outputSpeech: {
+                type: 'PlainText',
+                text: 'To check your plant health, you need to link your Plant Ranger account first. Please visit the Alexa app to complete the account linking process.',
+              },
+              shouldEndSession: true,
+            },
+          };
+        }
+        throw apiError;
+      }
     }
-
-    // Ensure tokens are valid (refresh if needed)
-    const validTokens = await oauthManager.ensureValidTokens(userId, tokens);
-    
-    // Make API call to check plant health with authentication
-    const apiClient = new ApiClient();
-    const plantHealth = await apiClient.checkPlantHealth();
 
     return {
       version: '1.0',
       response: {
         outputSpeech: {
           type: 'PlainText',
-          text: `Your plant health status is: ${plantHealth.status}. ${plantHealth.message}`,
+          text: plantHealth.status,
         },
         card: {
           type: 'Simple',
           title: 'Plant Health Check',
-          content: `Status: ${plantHealth.status}\n${plantHealth.message}`,
+          content: `Status: ${plantHealth.status}`,
         },
         shouldEndSession: true,
       },

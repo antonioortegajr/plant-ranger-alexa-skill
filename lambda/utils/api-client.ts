@@ -14,18 +14,28 @@ export class ApiClient {
     this.apiBaseUrl = process.env.PLANT_RANGER_API_BASE_URL || 'https://api.plantranger.com';
   }
 
-  async checkPlantHealth(): Promise<PlantHealthResponse> {
+  async checkPlantHealth(accessToken?: string): Promise<PlantHealthResponse> {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
       const response = await axios.get(`${this.apiBaseUrl}/health`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         timeout: 10000, // 10 second timeout
       });
+
+      console.log('API Response:', JSON.stringify(response.data, null, 2));
+      console.log('API Response status code:', response.status);
 
       // Transform API response to our expected format
       // The actual API returns: {"status":"healthy"}
       const apiStatus = response.data.status || 'Unknown';
+      console.log('Extracted status:', apiStatus);
       
       return {
         status: apiStatus,
