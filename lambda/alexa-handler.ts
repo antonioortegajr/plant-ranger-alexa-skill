@@ -173,6 +173,9 @@ async function handleIntentRequest(intent: any, userId: string): Promise<AlexaRe
     case 'CheckPlantHealthIntent':
       return await handleCheckPlantHealth(userId);
 
+    case 'ListPlantStatusIntent':
+      return await handleListPlantStatus(userId);
+
     case 'AMAZON.HelpIntent':
       return handleHelpIntent();
 
@@ -244,18 +247,172 @@ async function handleCheckPlantHealth(userId: string): Promise<AlexaResponse> {
   }
 }
 
+async function handleListPlantStatus(userId: string): Promise<AlexaResponse> {
+  try {
+    const oauthManager = new OAuthManager();
+    const apiClient = new ApiClient();
+    
+    // Check if user has OAuth tokens
+    const tokens = await oauthManager.getTokens(userId);
+    
+    if (!tokens) {
+      return {
+        version: '1.0',
+        response: {
+          outputSpeech: {
+            type: 'PlainText',
+            text: 'To check your plant status, you need to link your Plant Ranger account first. Please visit the Alexa app to complete the account linking process.',
+          },
+          shouldEndSession: true,
+        },
+      };
+    }
+
+    // Ensure tokens are valid (refresh if needed)
+    const validTokens = await oauthManager.ensureValidTokens(userId, tokens);
+
+    // Get all teams
+    const teamsResponse = await apiClient.getTeams(validTokens.accessToken);
+    const teams = teamsResponse.teams || [];
+
+    if (teams.length === 0) {
+      return {
+        version: '1.0',
+        response: {
+          outputSpeech: {
+            type: 'PlainText',
+            text: 'You don\'t have any teams set up yet. Please add a team in the Plant Ranger app first.',
+          },
+          shouldEndSession: true,
+        },
+      };
+    }
+
+    // Collect all plants from all teams
+    const allPlants: Array<{ name: string; id: string; needsWatered: boolean }> = [];
+
+    for (const team of teams) {
+      try {
+        const teamDetails = await apiClient.getTeamDetails(validTokens.accessToken, team.id);
+        const plants = teamDetails.plants || [];
+
+        // For each plant, get full details to check needs_watered
+        for (const plant of plants) {
+          try {
+            const plantDetails = await apiClient.getPlantDetails(validTokens.accessToken, plant.id);
+            
+            // Get needs_watered from the latest checkup
+            // Checkups are typically ordered with most recent first
+            const checkups = plantDetails.checkups || [];
+            let needsWatered = false;
+            
+            if (checkups.length > 0) {
+              // Get the most recent checkup (first in array)
+              const latestCheckup = checkups[0];
+              needsWatered = latestCheckup.needs_watered || false;
+            }
+
+            // Use name from plantDetails if available, fallback to plant summary name
+            const plantName = plantDetails.name || plant.name || 'Unnamed Plant';
+
+            allPlants.push({
+              name: plantName,
+              id: plant.id,
+              needsWatered,
+            });
+          } catch (plantError) {
+            console.error(`Error getting details for plant ${plant.id}:`, plantError);
+            // Continue with other plants even if one fails
+          }
+        }
+      } catch (teamError) {
+        console.error(`Error getting details for team ${team.id}:`, teamError);
+        // Continue with other teams even if one fails
+      }
+    }
+
+    if (allPlants.length === 0) {
+      return {
+        version: '1.0',
+        response: {
+          outputSpeech: {
+            type: 'PlainText',
+            text: 'You don\'t have any plants set up yet. Please add plants to your teams in the Plant Ranger app.',
+          },
+          shouldEndSession: true,
+        },
+      };
+    }
+
+    // Separate plants into those that need water and those that don't
+    const plantsNeedingWater = allPlants.filter(p => p.needsWatered);
+    const plantsNotNeedingWater = allPlants.filter(p => !p.needsWatered);
+
+    // Build the response message
+    let message = `You have ${allPlants.length} plant${allPlants.length !== 1 ? 's' : ''}. `;
+
+    if (plantsNeedingWater.length > 0) {
+      message += `${plantsNeedingWater.length} plant${plantsNeedingWater.length !== 1 ? 's need' : ' needs'} water: `;
+      message += plantsNeedingWater.map(p => p.name).join(', ');
+      
+      if (plantsNotNeedingWater.length > 0) {
+        message += `. ${plantsNotNeedingWater.length} plant${plantsNotNeedingWater.length !== 1 ? 's are' : ' is'} doing fine: `;
+        message += plantsNotNeedingWater.map(p => p.name).join(', ');
+      }
+    } else {
+      message += `All your plants are doing fine! `;
+      message += plantsNotNeedingWater.map(p => p.name).join(', ');
+    }
+
+    return {
+      version: '1.0',
+      response: {
+        outputSpeech: {
+          type: 'PlainText',
+          text: message,
+        },
+        card: {
+          type: 'Simple',
+          title: 'Plant Status',
+          content: `Total Plants: ${allPlants.length}\nNeeds Water: ${plantsNeedingWater.length}\n${plantsNeedingWater.length > 0 ? 'Plants needing water: ' + plantsNeedingWater.map(p => p.name).join(', ') : 'All plants are doing well!'}`,
+        },
+        shouldEndSession: true,
+      },
+    };
+
+  } catch (error) {
+    console.error('Error listing plant status:', error);
+    
+    // Handle specific error messages
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return {
+        version: '1.0',
+        response: {
+          outputSpeech: {
+            type: 'PlainText',
+            text: 'To check your plant status, you need to link your Plant Ranger account first. Please visit the Alexa app to complete the account linking process.',
+          },
+          shouldEndSession: true,
+        },
+      };
+    }
+
+    return createErrorResponse('Sorry, I couldn\'t retrieve your plant status right now. Please try again later.');
+  }
+}
+
 function handleHelpIntent(): AlexaResponse {
   return {
     version: '1.0',
     response: {
       outputSpeech: {
         type: 'PlainText',
-        text: 'Plant Ranger Check can help you monitor your plant health. You can say "check my plant health" to get a status update. You can also say "stop" to end the session.',
+        text: 'Plant Ranger Check can help you monitor your plant health. You can say "check my plant health" to get a status update, or "list my plant status" to see which plants need water. You can also say "stop" to end the session.',
       },
       reprompt: {
         outputSpeech: {
           type: 'PlainText',
-          text: 'What would you like to do? You can say "check my plant health" or "help" for more information.',
+          text: 'What would you like to do? You can say "check my plant health", "list my plant status", or "help" for more information.',
         },
       },
       shouldEndSession: false,
