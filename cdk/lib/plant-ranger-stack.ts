@@ -67,31 +67,39 @@ export class PlantRangerStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
     });
 
-    // OAuth handler Lambda function
-    const oauthHandler = new lambda.Function(this, 'OAuthHandler', {
+    // Token handler Lambda function (for users to enter API tokens)
+    const tokenHandler = new lambda.Function(this, 'TokenHandler', {
       runtime: lambda.Runtime.NODEJS_18_X,
-      handler: 'oauth-handler.handler',
+      handler: 'token-handler.handler',
       code: lambda.Code.fromAsset('../lambda'),
       role: lambdaRole,
       environment: {
         OAUTH_TOKENS_TABLE: oauthTokensTable.tableName,
-        OAUTH_SECRETS_NAME: oauthCredentialsSecret.secretName,
         LOG_LEVEL: 'INFO',
       },
       logRetention: logs.RetentionDays.ONE_WEEK,
       timeout: cdk.Duration.seconds(30),
     });
 
-    // API Gateway for OAuth callbacks
+    // API Gateway for token entry
     const api = new apigateway.RestApi(this, 'PlantRangerApi', {
-      restApiName: 'Plant Ranger OAuth API',
-      description: 'API Gateway for Plant Ranger OAuth callbacks',
+      restApiName: 'Plant Ranger Token API',
+      description: 'API Gateway for Plant Ranger token entry',
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: ['Content-Type', 'X-Amz-Date', 'Authorization', 'X-Api-Key'],
+      },
     });
 
-    // OAuth callback endpoint
-    const oauthResource = api.root.addResource('oauth');
-    oauthResource.addMethod('GET', new apigateway.LambdaIntegration(oauthHandler));
-    oauthResource.addMethod('POST', new apigateway.LambdaIntegration(oauthHandler));
+    // Token entry endpoint (authorization page)
+    const authorizeResource = api.root.addResource('authorize');
+    authorizeResource.addMethod('GET', new apigateway.LambdaIntegration(tokenHandler));
+    authorizeResource.addMethod('POST', new apigateway.LambdaIntegration(tokenHandler));
+
+    // Token endpoint (for OAuth token exchange)
+    const tokenResource = api.root.addResource('token');
+    tokenResource.addMethod('POST', new apigateway.LambdaIntegration(tokenHandler));
 
     // Outputs
     new cdk.CfnOutput(this, 'AlexaHandlerArn', {
@@ -99,14 +107,19 @@ export class PlantRangerStack extends cdk.Stack {
       description: 'ARN of the Alexa handler Lambda function',
     });
 
-    new cdk.CfnOutput(this, 'OAuthHandlerArn', {
-      value: oauthHandler.functionArn,
-      description: 'ARN of the OAuth handler Lambda function',
+    new cdk.CfnOutput(this, 'TokenHandlerArn', {
+      value: tokenHandler.functionArn,
+      description: 'ARN of the token handler Lambda function',
     });
 
-    new cdk.CfnOutput(this, 'OAuthCallbackUrl', {
-      value: `${api.url}oauth`,
-      description: 'OAuth callback URL for Alexa skill configuration',
+    new cdk.CfnOutput(this, 'AuthorizationUrl', {
+      value: `${api.url}authorize`,
+      description: 'Authorization URL for Alexa account linking',
+    });
+
+    new cdk.CfnOutput(this, 'TokenUrl', {
+      value: `${api.url}token`,
+      description: 'Token URL for Alexa account linking',
     });
 
     new cdk.CfnOutput(this, 'DynamoDBTableName', {

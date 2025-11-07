@@ -132,4 +132,23 @@ export class OAuthManager {
 
     await dynamodb.put({ TableName: tableName, Item: accessTokenItem }).promise();
   }
+
+  /**
+   * Store a token directly (for manual token entry)
+   */
+  async storeToken(userId: string, token: string): Promise<void> {
+    const tableName = process.env.OAUTH_TOKENS_TABLE || 'plant-ranger-oauth-tokens';
+    // Set expiration to 1 year from now (API tokens typically don't expire, but we set a long expiration)
+    const expiresAt = Date.now() + (365 * 24 * 60 * 60 * 1000);
+
+    const accessTokenItem = {
+      userId,
+      tokenType: 'access',
+      token: token,
+      expiresAt,
+      tokenTypeValue: 'Bearer',
+    };
+
+    await dynamodb.put({ TableName: tableName, Item: accessTokenItem }).promise();
+  }
 }
