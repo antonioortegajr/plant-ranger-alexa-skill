@@ -406,24 +406,50 @@ async function handleListPlantStatus(userId: string, request: AlexaRequest): Pro
         const teamDetails = await apiClient.getTeamDetails(accessToken, team.id);
         const plants = teamDetails.plants || [];
 
-        // For each plant, get full details to check needs_watered
+        // For each plant, check status from team details first, then get full details if needed
         for (const plant of plants) {
           try {
-            const plantDetails = await apiClient.getPlantDetails(accessToken, plant.id);
-            
-            // Get needs_watered from the latest checkup
-            // Checkups are typically ordered with most recent first
-            const checkups = plantDetails.checkups || [];
+            // First check if status is in the plant object from team details
             let needsWatered = false;
+            const plantFromTeam = plant;
             
-            if (checkups.length > 0) {
-              // Get the most recent checkup (first in array)
-              const latestCheckup = checkups[0];
-              needsWatered = latestCheckup.needs_watered || false;
+            // Check status in team details plant object
+            if (plantFromTeam.status === 'needs_water' || plantFromTeam.status === 'needs water') {
+              needsWatered = true;
+              console.log(`Plant ${plant.id} (${plantFromTeam.name || plant.name}): Found status=needs_water in team details`);
+            } else if (plantFromTeam.needs_water === true || plantFromTeam.needsWater === true) {
+              needsWatered = true;
+              console.log(`Plant ${plant.id}: Found needs_water=true in team details`);
+            } else {
+              // If not found in team details, get full plant details
+              const plantDetails = await apiClient.getPlantDetails(accessToken, plant.id);
+              
+              // Check plant details for status
+              if (plantDetails.status === 'needs_water' || plantDetails.status === 'needs water') {
+                needsWatered = true;
+                console.log(`Plant ${plant.id}: Found status=needs_water in plantDetails.status`);
+              } else if (plantDetails.needs_water === true || plantDetails.needsWater === true) {
+                needsWatered = true;
+                console.log(`Plant ${plant.id}: Found needs_water=true in plantDetails`);
+              } else {
+                // Check checkups
+                const checkups = plantDetails.checkups || [];
+                if (checkups.length > 0) {
+                  const latestCheckup = checkups[0];
+                  needsWatered = latestCheckup.status === 'needs_water' || 
+                                latestCheckup.status === 'needs water' ||
+                                latestCheckup.needs_watered === true || 
+                                latestCheckup.needsWatered === true || 
+                                false;
+                  console.log(`Plant ${plant.id}: Checkup status=${latestCheckup.status}, needs_watered=${latestCheckup.needs_watered}, final=${needsWatered}`);
+                } else {
+                  console.log(`Plant ${plant.id}: No status found, teamDetails.status=${plantFromTeam.status}, plantDetails.status=${plantDetails.status}`);
+                }
+              }
             }
 
-            // Use name from plantDetails if available, fallback to plant summary name
-            const plantName = plantDetails.name || plant.name || 'Unnamed Plant';
+            // Use name from team details or plant details
+            const plantName = plantFromTeam.name || plant.name || 'Unnamed Plant';
 
             allPlants.push({
               name: plantName,
@@ -458,20 +484,16 @@ async function handleListPlantStatus(userId: string, request: AlexaRequest): Pro
     const plantsNeedingWater = allPlants.filter(p => p.needsWatered);
     const plantsNotNeedingWater = allPlants.filter(p => !p.needsWatered);
 
-    // Build the response message
-    let message = `You have ${allPlants.length} plant${allPlants.length !== 1 ? 's' : ''}. `;
+    console.log(`Total plants: ${allPlants.length}, Needing water: ${plantsNeedingWater.length}, Not needing: ${plantsNotNeedingWater.length}`);
+
+    // Build the response message - when asking "which plants need water", only mention those that need water
+    let message = '';
 
     if (plantsNeedingWater.length > 0) {
-      message += `${plantsNeedingWater.length} plant${plantsNeedingWater.length !== 1 ? 's need' : ' needs'} water: `;
+      message = `${plantsNeedingWater.length} plant${plantsNeedingWater.length !== 1 ? 's need' : ' needs'} water: `;
       message += plantsNeedingWater.map(p => p.name).join(', ');
-      
-      if (plantsNotNeedingWater.length > 0) {
-        message += `. ${plantsNotNeedingWater.length} plant${plantsNotNeedingWater.length !== 1 ? 's are' : ' is'} doing fine: `;
-        message += plantsNotNeedingWater.map(p => p.name).join(', ');
-      }
     } else {
-      message += `All your plants are doing fine! `;
-      message += plantsNotNeedingWater.map(p => p.name).join(', ');
+      message = `None of your ${allPlants.length} plant${allPlants.length !== 1 ? 's need' : ' needs'} water right now. All your plants are doing fine!`;
     }
 
     return {
@@ -629,13 +651,20 @@ async function handleCheckTeamPlantStatus(userId: string, teamName: string | und
       try {
         const plantDetails = await apiClient.getPlantDetails(accessToken, plant.id);
         
-        // Get needs_watered from the latest checkup
+        // Get needs_watered from the latest checkup or plant status
         const checkups = plantDetails.checkups || [];
         let needsWatered = false;
         
-        if (checkups.length > 0) {
+        // First check if plant has a status field indicating needs_water
+        if (plantDetails.status === 'needs_water') {
+          needsWatered = true;
+        } else if (checkups.length > 0) {
           const latestCheckup = checkups[0];
-          needsWatered = latestCheckup.needs_watered || false;
+          // Check status field first, then needs_watered fields
+          needsWatered = latestCheckup.status === 'needs_water' || 
+                        latestCheckup.needs_watered || 
+                        latestCheckup.needsWatered || 
+                        false;
         }
 
         const plantName = plantDetails.name || plant.name || 'Unnamed Plant';
