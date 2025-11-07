@@ -5,11 +5,7 @@
         "endpoint": {
           "uri": "arn:aws:lambda:us-east-1:529123413029:function:plant-ranger-alexa-handler"
         },
-        "interfaces": [
-          {
-            "type": "AUDIO_PLAYER"
-          }
-        ]
+        "interfaces": []
       }
     },
     "publishingInformation": {
@@ -24,14 +20,11 @@
             "garden",
             "monitoring",
             "plant care"
-          ],
-          "smallIconUri": "https://example.com/small-icon.png",
-          "largeIconUri": "https://example.com/large-icon.png"
+          ]
         }
       },
       "isAvailableWorldwide": true,
       "testingInstructions": "Simply say 'check my plant health' to get a status update. The skill connects directly to the Plant Ranger API health endpoint.",
-      "category": "HEALTH_AND_FITNESS",
       "distributionCountries": []
     },
     "permissions": [

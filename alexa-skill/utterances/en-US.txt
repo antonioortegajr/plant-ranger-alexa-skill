@@ -22,6 +22,20 @@ plant monitoring
 plant care status
 vegetation health
 
+## ListPlantStatusIntent
+list my plant status
+what plants need water
+which plants need watering
+tell me about my plants
+what's the status of my plants
+list plant status
+plant watering status
+which of my plants need water
+do any of my plants need water
+check which plants need water
+show me my plant status
+plant status list
+
 ## Help Intent
 help
 what can you do

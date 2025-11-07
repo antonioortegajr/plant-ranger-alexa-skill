@@ -106,27 +106,6 @@ export class ApiClient {
     }
   }
 
-  async getPlantDetails(accessToken: string, plantId?: string): Promise<any> {
-    try {
-      const endpoint = plantId ? 
-        `${this.apiBaseUrl}/plants/${plantId}` : 
-        `${this.apiBaseUrl}/plants`;
-      
-      const response = await axios.get(endpoint, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 10000,
-      });
-
-      return response.data;
-
-    } catch (error) {
-      console.error('Error getting plant details:', error);
-      throw new Error('Failed to retrieve plant details');
-    }
-  }
-
   async getPlantRecommendations(accessToken: string): Promise<string[]> {
     try {
       const response = await axios.get(`${this.apiBaseUrl}/plants/recommendations`, {
@@ -141,6 +120,84 @@ export class ApiClient {
     } catch (error) {
       console.error('Error getting plant recommendations:', error);
       return ['Unable to retrieve recommendations at this time'];
+    }
+  }
+
+  async getTeams(accessToken: string): Promise<any> {
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      };
+
+      const response = await axios.get(`${this.apiBaseUrl}/v1/teams`, {
+        headers,
+        timeout: 10000,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error getting teams:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response && error.response.status === 401) {
+          throw new Error('Unauthorized - please link your account');
+        }
+      }
+      throw new Error('Failed to retrieve teams');
+    }
+  }
+
+  async getTeamDetails(accessToken: string, teamId: string): Promise<any> {
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      };
+
+      const response = await axios.get(`${this.apiBaseUrl}/v1/teams/${teamId}`, {
+        headers,
+        timeout: 10000,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting team details for team ${teamId}:`, error);
+      if (axios.isAxiosError(error)) {
+        if (error.response && error.response.status === 404) {
+          throw new Error('Team not found');
+        }
+        if (error.response && error.response.status === 401) {
+          throw new Error('Unauthorized - please link your account');
+        }
+      }
+      throw new Error('Failed to retrieve team details');
+    }
+  }
+
+  async getPlantDetails(accessToken: string, plantId: string): Promise<any> {
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      };
+
+      const response = await axios.get(`${this.apiBaseUrl}/v1/plants/${plantId}`, {
+        headers,
+        timeout: 10000,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting plant details for plant ${plantId}:`, error);
+      if (axios.isAxiosError(error)) {
+        if (error.response && error.response.status === 404) {
+          throw new Error('Plant not found');
+        }
+        if (error.response && error.response.status === 401) {
+          throw new Error('Unauthorized - please link your account');
+        }
+      }
+      throw new Error('Failed to retrieve plant details');
     }
   }
 }

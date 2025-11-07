@@ -4,19 +4,89 @@
       "invocationName": "plant ranger check",
       "intents": [
         {
+          "name": "CheckTeamPlantStatusIntent",
+          "slots": [
+            {
+              "name": "TeamName",
+              "type": "AMAZON.SearchQuery",
+              "samples": []
+            }
+          ],
+          "samples": [
+            "what plants need water in team {TeamName}",
+            "what plants need water in {TeamName}",
+            "which plants need watering in team {TeamName}",
+            "which plants need watering in {TeamName}",
+            "what's the status of plants in team {TeamName}",
+            "what's the status of plants in {TeamName}",
+            "check plants in team {TeamName}",
+            "check plants in {TeamName} group",
+            "status of team {TeamName} plants",
+            "status of {TeamName} plants",
+            "tell me about plants in team {TeamName}",
+            "tell me about plants in {TeamName}",
+            "what's the status of my team {TeamName} plants",
+            "what's the status of my {TeamName} plants",
+            "list plant status for team {TeamName}",
+            "list plant status for {TeamName}",
+            "plant watering status for team {TeamName}",
+            "plant watering status for {TeamName}",
+            "which plants need water in the team {TeamName} group",
+            "which plants need water in the {TeamName} group",
+            "which plants need water in team {TeamName}",
+            "check which plants need water in team {TeamName}",
+            "check which plants need water in {TeamName}",
+            "show me plant status for team {TeamName}",
+            "show me plant status for {TeamName}",
+            "plant status for team {TeamName}",
+            "plant status for {TeamName}",
+            "how are the plants in team {TeamName} doing",
+            "how are the plants in {TeamName} doing",
+            "plants in team {TeamName}",
+            "plants in {TeamName} group",
+            "what's in team {TeamName}",
+            "what's in {TeamName}",
+            "show team {TeamName} plants",
+            "show {TeamName} plants",
+            "check team {TeamName}",
+            "check {TeamName} group",
+            "what plants are in team {TeamName}",
+            "what plants are in {TeamName}",
+            "get plants in team {TeamName}",
+            "get plants in {TeamName}",
+            "display plants in team {TeamName}",
+            "display plants in {TeamName}"
+          ]
+        },
+        {
           "name": "CheckPlantHealthIntent",
           "slots": [],
           "samples": [
             "check my plant health",
             "how is my plant doing",
             "is my plant healthy",
-            "plant status check",
-            "check plant status",
             "what's my plant health",
             "plant health check",
-            "how are my plants",
-            "plant health status",
-            "check plants"
+            "overall plant health",
+            "general plant health"
+          ]
+        },
+        {
+          "name": "ListPlantStatusIntent",
+          "slots": [],
+          "samples": [
+            "list my plant status",
+            "what plants need water",
+            "which plants need watering",
+            "tell me about my plants",
+            "what's the status of my plants",
+            "list plant status",
+            "plant watering status",
+            "which of my plants need water",
+            "do any of my plants need water",
+            "check which plants need water",
+            "show me my plant status",
+            "plant status list"
           ]
         },
         {
