@@ -22,7 +22,10 @@ Offcial site: https://www.plantranger.com/
 ## 🌱 Features
 
 - **Plant Health Monitoring**: Check the health status of your plants
+- **Water Status Checking**: Find out which plants need water across all teams or specific teams
+- **Team-Specific Queries**: Check plant status for specific teams or groups
 - **OAuth 2.0 Integration**: Secure authentication with Plant Ranger API
+- **Bearer Token Support**: Fallback to static API token for testing
 - **AWS CDK Deployment**: Infrastructure as code for easy deployment
 - **Lambda Functions**: Serverless architecture for scalability
 - **DynamoDB Storage**: Secure token storage and management
@@ -35,7 +38,16 @@ User → Alexa Device → Lambda (Alexa Handler) → Plant Ranger API
                 DynamoDB (OAuth Tokens)
                     ↓
                 Secrets Manager (Credentials)
+                    ↓
+            Token Handler (API Gateway) → Token Entry UI
 ```
+
+### Token Management
+
+The skill supports multiple token sources (in priority order):
+1. **Alexa-hosted account linking**: Token from Alexa request context
+2. **Self-hosted account linking**: Token stored in DynamoDB
+3. **Static API token**: Environment variable fallback for testing
 
 ## 📁 Project Structure
 
@@ -49,7 +61,7 @@ plant-ranger-alexa-skill/
 │   └── package.json
 ├── lambda/                       # Lambda functions
 │   ├── alexa-handler.ts         # Main Alexa skill handler
-│   ├── oauth-handler.ts         # OAuth flow handler
+│   ├── token-handler.ts         # Token entry handler (API Gateway)
 │   ├── utils/
 │   │   ├── oauth.ts             # OAuth management utilities
 │   │   └── api-client.ts        # Plant Ranger API client
@@ -59,15 +71,9 @@ plant-ranger-alexa-skill/
 │   └── interactionModels/
 │       └── custom/
 │           └── en-US.json       # Interaction model
-├── alexa-skill/                 # Original skill files (backup)
-│   ├── skill.json               
-│   ├── models/
-│   │   └── en-US.json           
-│   └── utterances/
-│       └── en-US.txt            
 ├── ask-resources.json           # ASK CLI configuration
-├── ask-deploy.sh                # ASK CLI deployment script
-├── deploy.sh                    # CDK deployment script
+├── env.example                  # Environment variables example
+├── lambda-policy.json           # IAM policy reference
 └── README.md
 ```
 
@@ -149,20 +155,37 @@ ask deploy
 
 The Lambda functions use these environment variables:
 
-- `OAUTH_TOKENS_TABLE`: DynamoDB table name for token storage
-- `OAUTH_SECRETS_NAME`: Secrets Manager secret name
+- `OAUTH_TOKENS_TABLE`: DynamoDB table name for token storage (default: `plant-ranger-oauth-tokens`)
+- `OAUTH_SECRETS_NAME`: Secrets Manager secret name (default: `plant-ranger-oauth-credentials`)
+- `PLANT_RANGER_API_BASE_URL`: Base URL for Plant Ranger API (default: `https://api.plantranger.com`)
+- `PLANT_RANGER_API_TOKEN`: Static API token for testing (optional, used as fallback)
 - `LOG_LEVEL`: Logging level (INFO, DEBUG, ERROR)
 
 ### OAuth Configuration
 
-The skill uses OAuth 2.0 Authorization Code flow:
+The skill supports multiple authentication methods:
 
-1. User initiates plant health check
-2. If no valid token exists, redirect to authorization URL
-3. User authorizes the application
-4. Authorization code is exchanged for access token
-5. Access token is stored in DynamoDB
-6. API calls are made with the access token
+1. **OAuth 2.0 Authorization Code flow** (recommended):
+   - User initiates plant health check
+   - If no valid token exists, redirect to authorization URL
+   - User authorizes the application
+   - Authorization code is exchanged for access token
+   - Access token is stored in DynamoDB
+   - API calls are made with the access token
+
+2. **Static API Token** (for testing):
+   - Set `PLANT_RANGER_API_TOKEN` environment variable
+   - Used as fallback when no OAuth token is available
+
+### Plant Status Detection
+
+The skill checks for plants that need water by looking for status indicators in multiple locations:
+1. Team details response (`plant.status === 'needs_water'`)
+2. Individual plant details (`plantDetails.status === 'needs_water'`)
+3. Latest checkup status (`checkup.status === 'needs_water'`)
+4. Boolean flags (`needs_water`, `needsWatered`, `needs_watered`)
+
+This ensures compatibility with different API response formats.
 
 ## 🧪 Testing
 
@@ -188,8 +211,10 @@ curl -X POST https://your-lambda-url/oauth \
 
 1. **Launch Request**: "Alexa, open Plant Ranger Check"
 2. **Health Check**: "Check my plant health"
-3. **Help**: "Help"
-4. **Stop**: "Stop"
+3. **List Plant Status**: "Which plants need water" or "What plants need water"
+4. **Team-Specific Status**: "Check plants in [team name]" or "What plants need water in [team name]"
+5. **Help**: "Help"
+6. **Stop**: "Stop"
 
 ## 🔒 Security
 
@@ -226,10 +251,19 @@ cdk deploy
 
 ### Adding New Intents
 
-1. Update `alexa-skill/models/en-US.json`
+1. Update `skill-package/interactionModels/custom/en-US.json`
 2. Add intent handler in `lambda/alexa-handler.ts`
-3. Add sample utterances in `alexa-skill/utterances/en-US.txt`
+3. Add sample utterances in the interaction model
 4. Test and deploy
+
+### Available Intents
+
+- **CheckPlantHealthIntent**: General plant health check
+- **ListPlantStatusIntent**: List all plants and their watering status
+- **CheckTeamPlantStatusIntent**: Check plant status for a specific team
+- **AMAZON.HelpIntent**: Get help with using the skill
+- **AMAZON.StopIntent**: Stop the skill
+- **AMAZON.CancelIntent**: Cancel current operation
 
 ## 🐛 Troubleshooting
 
